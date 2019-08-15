@@ -101,15 +101,14 @@ else version (CppRuntime_Gcc)
 
     extern (C++, "__cxxabiv1")
     {
-        class __class_type_info;
+        class __class_type_info {}
     }
 
     extern (C++, "std"):
 
     class type_info
     {
-        void dtor1();                           // consume destructor slot in vtbl[]
-        void dtor2();                           // consume destructor slot in vtbl[]
+        ~this();
         final const(char)* name()() const nothrow {
             return _name[0] == '*' ? _name + 1 : _name;
         }
@@ -131,15 +130,108 @@ else version (CppRuntime_Gcc)
 
     class bad_cast : exception
     {
-        this();
+        this() {}
         //~this();
         override const(char)* what() const;
     }
 
     class bad_typeid : exception
     {
-        this();
+        this() {}
         //~this();
+        override const(char)* what() const;
+    }
+}
+else version (CppRuntime_Clang)
+{
+    import core.experimental.stdcpp.exception;
+
+    version (iOS) version (D_LP64)
+        version = iOS64;
+
+    version (iOS64)
+        enum _LIBCPP_NONUNIQUE_RTTI_BIT = 1UL << 63;
+    else
+        enum _LIBCPP_NONUNIQUE_RTTI_BIT = 0;
+
+    static if (_LIBCPP_NONUNIQUE_RTTI_BIT)
+        version = _LIBCPP_HAS_NONUNIQUE_TYPEINFO;
+    else
+        version = _LIBCPP_HAS_UNIQUE_TYPEINFO;
+
+    extern (C++, "std"):
+
+    class type_info
+    {
+        ~this();
+        //final bool operator==(const type_info rhs) const;
+        //final bool operator!=(const type_info rhs) const;
+
+        version (_LIBCPP_HAS_NONUNIQUE_TYPEINFO)
+        {
+            import core.stdc.stdint : uintptr_t;
+
+            final int __compare_nonunique_names(const type_info __arg) const
+            {
+                import core.stdc.string : strcmp;
+                return strcmp(name(), __arg.name());
+            }
+
+            final const(char)* name() const
+            {
+                return cast(const(char)*) (__type_name & ~_LIBCPP_NONUNIQUE_RTTI_BIT);
+            }
+
+            final bool before(const type_info __arg) const
+            {
+                if (!((__type_name & __arg.__type_name) & _LIBCPP_NONUNIQUE_RTTI_BIT))
+                    return __type_name < __arg.__type_name;
+                return __compare_nonunique_names(__arg) < 0;
+            }
+
+            final size_t hash_code() const
+            {
+                if (!(__type_name & _LIBCPP_NONUNIQUE_RTTI_BIT))
+                    return __type_name;
+
+                const(char)* __ptr = name();
+                size_t __hash = 5381;
+                ubyte __c;
+                while ((__c = cast(ubyte)(*__ptr++)) != 0)
+                    __hash = (__hash * 33) ^ __c;
+                return __hash;
+            }
+
+            //bool operator==(const type_info& __arg) const
+
+            uintptr_t __type_name;
+            this(const(char)* __n) { __type_name = cast(uintptr_t) __n; }
+        }
+        else
+        {
+            final const(char)* name() const { return __type_name; }
+            final bool before(const type_info __arg) const { return __type_name < __arg.__type_name; }
+            final size_t hash_code() const { return cast(size_t) __type_name; }
+            //bool operator==(const type_info& __arg) const
+
+            const(char)* __type_name;
+            this(const(char)* __n) { __type_name = __n; }
+        }
+
+        //bool operator!=(const type_info& __arg) const
+    }
+
+    class bad_cast : exception
+    {
+        this();
+        ~this();
+        override const(char)* what() const;
+    }
+
+    class bad_typeid : exception
+    {
+        this();
+        ~this();
         override const(char)* what() const;
     }
 }
