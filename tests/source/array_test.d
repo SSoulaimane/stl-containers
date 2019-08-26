@@ -12,7 +12,7 @@ unittest
     assert(arr.empty == false);
     assert(arr.front == 1);
 
-    assert(sumOfElements_val(arr)[0] == 160);
+    assert(sumOfElements_val(arr)[0] == 100);
     assert(sumOfElements_ref(arr)[0] == 15);
 
     array!(int, 0) arr2;
